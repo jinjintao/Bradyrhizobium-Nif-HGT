@@ -1,0 +1,251 @@
+### generate itol.txt file to annotate gene gain or loss pattern ###
+# cd /home-user/jjtao/Rhizobiales/Figure/gene_gain_loss
+# use reformat forms
+
+
+import pandas as pd
+from collections import defaultdict
+import plotly.express as px
+
+## gene_list 
+genes = {'nod':['nodA', 'nodB', 'nodC', 'nodI', 'nodJ'],
+         'T3SS':['xopD','sctC', 'sctJ', 'sctN', 'sctQ', 'sctR', ],#'sctS', 'sctT', 'sctU', 'sctV'
+         'T4SS':[#'virB1','virB2','virB3','virB4','virB5','virB6','virB7','virB8','virB9','virB10','virB11','virD4',
+                 'trbB','trbC','trbD','trbE','trbF','trbI'],#'trbJ','trbL','trbG'
+         'Transposase':['K07481','K07486','K07487','K07492','K07493','K07494','K07497'], #'K07482','K07483',
+         'nif':['nifB','nifD','nifE','nifH','nifK','nifN'],
+         'fix':['carD','carE','fixC','fixX'], # remember to change the name of carDE to fixAB
+         'molybdenum transporter':['modA','modB','modC','modD','modE'],
+         'hydrogenase':['hyaA','hyaB'],
+         'Biotin biosynthesis':['bioA','bioB','bioD','bioF'],
+         'Denitrification':['narG','narH','narI','narJ','nosD','nosF','nosL','nosR','nosY','nosZ','napA','napB','napC'],
+         'heme':['glbN','hemN'],
+         'quorum sensing':['cciR'],
+         'DNA partition':['parA','parB'],
+         'Metal transpoter':['czcA','czcB','irr'],
+         'Aromatic compounds metabolism':['bbsB','ligI']
+        }
+# correspond to ko
+f = open('/home-user/jjtao/Rhizobiales/badirate/ko_info.tab')
+ko_info = {}
+for line in f.readlines():
+    ko = line.split('\t')[0].strip('ko:')
+    gn = line.split('\t')[1].split(';')[0]
+    ko_info[gn] = ko
+f.close()
+
+gene_ko = defaultdict(lambda: defaultdict(list))
+for cate in genes.keys():
+    for gene in genes[cate]:
+        if gene in ko_info.keys():
+            gene_ko[gene] = ko_info[gene]
+        else:
+            for k in ko_info.keys():
+                if gene == k.split(',')[0]:
+                    gene_ko[gene] = ko_info[k]
+                else:
+                    if len(k.split(',')) >1:
+                        if gene == k.split(',')[1].strip():
+                            gene_ko[gene] = ko_info[k]
+gene_ko['parA'] = 'K03496'
+gene_ko['parB'] = 'K03497'
+
+
+#check 
+for cate in genes.keys():
+    for gene in genes[cate]:
+        if gene not in gene_ko.keys():
+            print(cate,gene)
+
+##
+life = {'FLnonnif-Sym':['FLnonnif-Sym1','FLnonnif-Sym2','FLnonnif-Sym3','FLnonnif-Sym4','FLnonnif-Sym5','FLnonnif-Sym6','FLnonnif-Sym7','FLnonnif-Sym8'],
+          'Sym-FLnonnif':['Sym-FLnonnif1','Sym-FLnonnif2','Sym-FLnonnif3','Sym-FLnonnif4','Sym-FLnonnif5','Sym-FLnonnif6','Sym-FLnonnif7','Sym-FLnonnif8','Sym-FLnonnif9','Sym-FLnonnif10','Sym-FLnonnif11','Sym-FLnonnif12','Sym-FLnonnif13'],
+          'Sym-FLnif':['Sym-FLnif1','Sym-FLnif2','Sym-FLnif3','Sym-FLnif4','Sym-FLnif5','Sym-FLnif6','Sym-FLnif7','Sym-FLnif8','Sym-FLnif9','Sym-FLnif10'],
+          'FLnonnif-FLnif':['FLnonnif-FLnif1','FLnonnif-FLnif2','FLnonnif-FLnif3','FLnonnif-FLnif4'],
+          'N-FLnif-s':['N-FLnif1','N-FLnif2','N-FLnif3','N-FLnif4','N-FLnif5','N-FLnif6','N-FLnif7','N-FLnif8'],
+        }
+
+# assign color
+gene_color = {'nod':'#FF0000',
+'T3SS':'#F08080',
+'T4SS':'#FFA500',
+'Transposase':'#FFD700',
+'nif': '#33CC99',
+'fix' : '#99CC00',
+'molybdenum transporter':'#CC99FF',
+'hydrogenase':'#99FFFF',
+'Biotin biosynthesis':'#1E90FF',
+'Denitrification':'#FF83FA',
+'heme': '#CC0000',
+'quorum sensing':'#008B8B',
+'DNA partition':'#6E7B8B',
+'Metal transpoter':'#FF8C00',
+'Aromatic compounds metabolism':'#FF34B3'
+}
+labels = []
+colors = []
+for cate in genes.keys():
+    color = gene_color[cate]
+    color = color.replace(',',' ')
+    for v in genes[cate]:
+        labels.append(v)
+        colors.append(color)
+    labels.append(' ')
+    colors.append(color)
+
+####################################################################################
+def itol(gene_ko, df, colors, LT): 
+    #increase 
+    fill_df = pd.DataFrame(columns = gene_ko.keys(), index = life[LT])
+    for k,v in gene_ko.items(): # k:genename v:ko number
+            for l in life[LT]: #l is FL-N1
+                if v in df.index:
+                    cell =  df.loc[v, l]
+                    if int(cell.split(',')[2]) > 0:
+                        if int(cell.split(',')[1]) == 0:
+                            fill_df.loc[l,k] = 1
+                        else:
+                            fill_df.loc[l,k] = 0
+    itol = [] # generate itol.txt
+    f = open('/home-user/jjtao/Rhizobiales/Figure/gene_gain_loss/itol.txt') 
+    lines = f.readlines()
+    f.close()
+    for line in lines:
+        if not line.startswith('#'):
+            if 'DATASET_LABEL' in line:
+                line = f'DATASET_LABEL,{LT}_gain\n'
+            elif 'FIELD_SHAPES' in line:
+                line = 'FIELD_SHAPES' + ',5'*len(labels) + '\n'
+            elif 'FIELD_LABELS' in line:
+                line = 'FIELD_LABELS,' + ','.join(labels) + '\n'
+            elif 'FIELD_COLORS' in line:
+                line = 'FIELD_COLORS,'+ ','.join(colors) + '\n'
+            else:
+                pass
+        itol.append(line)
+    for lt in fill_df.index:
+        fill = []
+        for gene in labels:
+            if gene in fill_df.columns and not pd.isna(fill_df.loc[lt,gene]):
+                cell = fill_df.loc[lt,gene]
+            else:
+                cell = -1
+            fill.append(cell)
+        fill_ = lt + ',' + ','.join([str(x) for x in fill]) + '\n'
+        itol.append(fill_)
+    filename = lt.strip('0123456789').strip(' ')  + '_I.txt'
+    fileObject = open(filename , 'w')
+    for it in itol:
+        fileObject.write(it)
+    fileObject.close()
+    
+    #decrease
+    fill_df = pd.DataFrame(columns = gene_ko.keys(), index = life[LT])
+    for k,v in gene_ko.items(): # k:genename v:ko number
+            for l in life[LT]: #l is FL-N1
+                if v in df.index:
+                    cell =  df.loc[v, l]
+                    if int(cell.split(',')[2]) < 0:
+                        if int(cell.split(',')[0]) == 0:
+                            fill_df.loc[l,k] = 1
+                        else:
+                            fill_df.loc[l,k] = 0
+    itol = [] # generate itol.txt
+    f = open('/home-user/jjtao/Rhizobiales/Figure/gene_gain_loss/itol.txt') 
+    lines = f.readlines()
+    f.close()
+    for line in lines:
+        if not line.startswith('#'):
+            if 'DATASET_LABEL' in line:
+                line = f'DATASET_LABEL,{LT}_loss\n'
+            elif 'FIELD_SHAPES' in line:
+                line = 'FIELD_SHAPES' + ',4'*len(labels) + '\n'
+            elif 'FIELD_LABELS' in line:
+                line = 'FIELD_LABELS,' + ','.join(labels) + '\n'
+            elif 'FIELD_COLORS' in line:
+                line = 'FIELD_COLORS,'+ ','.join(colors) + '\n'
+            else:
+                pass
+        itol.append(line)
+    for lt in fill_df.index:
+        fill = []
+        for gene in labels:
+            if gene in fill_df.columns and not pd.isna(fill_df.loc[lt,gene]):
+                cell = fill_df.loc[lt,gene]
+            else:
+                cell = -1
+            fill.append(cell)
+        fill_ = lt + ',' + ','.join([str(x) for x in fill]) + '\n'
+        itol.append(fill_)
+    filename = lt.strip('0123456789').strip(' ')  + '_D.txt'
+    fileObject = open(filename , 'w')
+    for it in itol:
+        fileObject.write(it)
+    fileObject.close()
+    
+    #no gain or loss
+    fill_df = pd.DataFrame(columns = gene_ko.keys(), index = life[LT])
+    for k,v in gene_ko.items(): # k:genename v:ko number
+            for l in life[LT]: #l is FL-N1
+                if v in df.index:
+                    cell =  df.loc[v, l]
+                    if int(cell.split(',')[2]) == 0:
+                        if int(cell.split(',')[0]) > 0:
+                            fill_df.loc[l,k] = 1
+                        else:
+                            fill_df.loc[l,k] = -1
+    itol = [] # generate itol.txt
+    f = open('/home-user/jjtao/Rhizobiales/Figure/gene_gain_loss/itol.txt') 
+    lines = f.readlines()
+    f.close()
+    for line in lines:
+        if not line.startswith('#'):
+            if 'DATASET_LABEL' in line:
+                line = f'DATASET_LABEL,{LT}_even\n'
+            elif 'FIELD_SHAPES' in line:
+                line = 'FIELD_SHAPES' + ',1'*len(labels) + '\n'
+            elif 'FIELD_LABELS' in line:
+                line = 'FIELD_LABELS,' + ','.join(labels) + '\n'
+            elif 'FIELD_COLORS' in line:
+                line = 'FIELD_COLORS,'+ ','.join(colors) + '\n'
+            else:
+                pass
+        itol.append(line)
+    for lt in fill_df.index:
+        fill = []
+        for gene in labels:
+            if gene in fill_df.columns and not pd.isna(fill_df.loc[lt,gene]):
+                cell = fill_df.loc[lt,gene]
+            else:
+                cell = -1
+            fill.append(cell)
+        fill_ = lt + ',' + ','.join([str(x) for x in fill]) + '\n'
+        itol.append(fill_)
+    filename = lt.strip('0123456789').strip(' ')  + '_E.txt'
+    fileObject = open(filename , 'w')
+    for it in itol:
+        fileObject.write(it)
+    fileObject.close()
+    return LT
+
+#make sure the table title are 'ko,extent,ancestor,change,name,appear times'
+# FLnonnif-FLnif
+LT = 'FLnonnif-FLnif'
+df = pd.read_csv('/home-user/jjtao/Rhizobiales/kegg_hmmsearch/Brady345/before_rename/e20/badirate/FLnonnif-FLnif/FLnonnif-FLnif_kegg-BDI-FR-CWP/FLnonnif-FLnif_hmmkegg-BDI-FR-CWP-reformat.csv',header=0,index_col=0)
+itol(gene_ko, df, colors, LT)
+
+# Sym-FLnonnif
+LT = 'Sym-FLnonnif'
+df = pd.read_csv('/home-user/jjtao/Rhizobiales/kegg_hmmsearch/Brady345/before_rename/e20/badirate/Sym-FLnonnif/Sym-FLnonnif_hmmkegg-BDI-FR-CWP/Sym-FLnonnif_hmmkegg-BDI-FR-CWP-reformat.csv',header=0,index_col=0) 
+itol(gene_ko, df, colors, LT)
+
+# FLnonnif-Sym
+LT = 'FLnonnif-Sym'
+df = pd.read_csv('/home-user/jjtao/Rhizobiales/kegg_hmmsearch/Brady345/before_rename/e20/badirate/FLnonnif-Sym/FLnonnif-Sym_kegg-BDI-FR-CWP/FLnonnif-Sym_hmmkegg-BDI-FR-CWP-reformat.csv',header=0,index_col=0) 
+itol(gene_ko, df, colors, LT)
+
+# Sym-FLnif
+LT = 'Sym-FLnif'
+df = pd.read_csv('/home-user/jjtao/Rhizobiales/kegg_hmmsearch/Brady345/before_rename/e20/badirate/Sym-FLnif/Sym-FLnif_hmmkegg-BDI-FR-CWP/Sym-FLnif_hmmkegg-BDI-FR-CWP-reformat.csv',header=0,index_col=0)
+itol(gene_ko, df, colors, LT)
+
