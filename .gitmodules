@@ -1,0 +1,3 @@
+[submodule "nifH_amplicons_analysis"]
+	path = nifH_amplicons_analysis
+	url = https://github.com/444thLiao/nifH_amplicons_analysis
